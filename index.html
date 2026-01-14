@@ -1,0 +1,287 @@
+```html
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <!-- 微信分享元数据 -->
+    <title>塔罗迷宫：MBTI人格觉醒</title>
+    <meta name="description" content="测测你的MBTI人格，在塔罗幻境中挑战命运！">
+    
+    <style>
+        :root { --p-color: #00ffcc; --bg-dark: #0a0a0a; }
+        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+        
+        body { 
+            background: var(--bg-dark); color: #eee; 
+            font-family: 'Courier New', Courier, monospace; 
+            margin: 0; padding: 0; display: flex; flex-direction: column; align-items: center;
+            height: 100vh; overflow: hidden;
+        }
+
+        /* 选角界面 */
+        #selection-screen { 
+            width: 100%; height: 100%; display: flex; flex-direction: column; 
+            align-items: center; justify-content: center; 
+            background: radial-gradient(circle, #1a1a2e 0%, #000 100%);
+            padding: 20px; text-align: center;
+        }
+        .char-list { display: flex; flex-direction: column; gap: 15px; width: 100%; max-width: 300px; }
+        .char-card { 
+            padding: 15px; border: 2px solid #444; background: #111; 
+            border-radius: 8px; cursor: pointer;
+        }
+        .char-card:active { transform: scale(0.98); border-color: var(--p-color); }
+
+        /* 游戏主界面 */
+        #game-ui { 
+            display: none; width: 100%; max-width: 500px; height: 100%;
+            padding: 15px; flex-direction: column;
+        }
+
+        .stats-header { 
+            display: flex; justify-content: space-between; font-size: 14px;
+            padding: 10px; background: #111; border: 1px solid #333; margin-bottom: 10px;
+        }
+
+        .boss-box { 
+            text-align: center; padding: 15px; border: 2px solid #ff4444; 
+            background: #1a0000; margin-bottom: 10px; position: relative;
+        }
+        .hp-bar { height: 6px; background: #300; margin-top: 8px; }
+        .hp-fill { height: 100%; background: #ff4444; transition: width 0.3s; }
+
+        .log-window { 
+            flex-grow: 1; overflow-y: auto; background: #000; border: 1px solid #222;
+            padding: 8px; font-size: 12px; margin-bottom: 10px; color: #aaa;
+        }
+
+        .controls { margin-bottom: 10px; display: flex; justify-content: center; }
+        .btn-redraw { 
+            background: #333; color: #fff; border: 1px solid #666; 
+            padding: 8px 20px; border-radius: 20px; font-size: 12px;
+        }
+
+        .hand { 
+            display: flex; gap: 8px; justify-content: center; 
+            padding-bottom: 20px;
+        }
+        .card { 
+            width: 31%; aspect-ratio: 2/3; border: 1px solid #444; 
+            background: #111; border-radius: 6px; display: flex;
+            flex-direction: column; align-items: center; justify-content: center;
+            text-align: center; font-size: 11px; padding: 5px;
+        }
+        .card:active { background: #222; border-color: var(--p-color); }
+
+        /* 遗物弹窗 */
+        #relic-ui {
+            display: none; position: fixed; top: 20%; left: 5%; width: 90%;
+            background: #000; border: 2px solid #ffd700; padding: 20px;
+            z-index: 100; text-align: center; box-shadow: 0 0 30px #000;
+        }
+        .relic-opt { 
+            display: block; width: 100%; padding: 12px; border: 1px solid #ffd700;
+            margin: 10px 0; color: #ffd700;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- 选择界面 -->
+    <div id="selection-screen">
+        <h2 style="color: #ffd700; margin-bottom: 5px;">塔罗迷宫</h2>
+        <p style="font-size: 12px; color: #888;">选择你的MBTI人格进入幻境</p>
+        <div class="char-list">
+            <div class="char-card" onclick="startGame('INTP')" style="--p-color: #ff00ff;">
+                <b style="color:#ff00ff">INTP 隐士</b><br><small>逻辑推演 · 爆发伤害</small>
+            </div>
+            <div class="char-card" onclick="startGame('ENFP')" style="--p-color: #ffea00;">
+                <b style="color:#ffea00">ENFP 愚者</b><br><small>灵感随机 · 极限翻盘</small>
+            </div>
+            <div class="char-card" onclick="startGame('ISFP')" style="--p-color: #00ffcc;">
+                <b style="color:#00ffcc">ISFP 星星</b><br><small>审美节奏 · 持续治愈</small>
+            </div>
+        </div>
+        <p style="margin-top: 20px; font-size: 10px; color: #444;">微信端优化版 v2.0</p>
+    </div>
+
+    <!-- 游戏界面 -->
+    <div id="game-ui">
+        <div class="stats-header">
+            <div><b id="p-name"></b> HP:<span id="p-hp"></span></div>
+            <div style="color: var(--p-color)"><span id="res-name"></span>:<span id="p-res"></span></div>
+            <div>关卡:<span id="level"></span></div>
+        </div>
+
+        <div class="boss-box">
+            <div id="boss-display" style="font-size: 14px; color: #ff4444;">BOSS</div>
+            <div style="font-size: 12px;">HP: <span id="b-hp"></span>/<span id="b-max-hp"></span></div>
+            <div class="hp-bar"><div id="b-fill" class="hp-fill"></div></div>
+        </div>
+
+        <div class="log-window" id="log"></div>
+
+        <div class="controls">
+            <button class="btn-redraw" onclick="redrawHand()">🔄 重构手牌 (-5 HP)</button>
+        </div>
+
+        <div class="hand" id="hand"></div>
+
+        <div id="relic-ui">
+            <h3 style="color:#ffd700">获得塔罗遗物</h3>
+            <div id="relic-list"></div>
+        </div>
+    </div>
+
+<script>
+    const CHAR_DATA = {
+        INTP: { hp: 80, res: "逻辑", color: "#ff00ff", cards: [
+            { n: "推演", d: 8, c: 1, desc: "+1逻辑" },
+            { n: "分析", d: 4, c: 2, desc: "+2逻辑" },
+            { n: "结论", d: 22, c: -3, desc: "-3逻辑爆发" }
+        ]},
+        ENFP: { hp: 100, res: "热情", color: "#ffea00", cards: [
+            { n: "火花", d: [5, 22], c: 1, desc: "+1热情" },
+            { n: "漫游", d: 10, c: 1, desc: "+1热情" },
+            { n: "狂想", d: [2, 45], c: -2, desc: "-2热情爆发" }
+        ]},
+        ISFP: { hp: 95, res: "流", color: "#00ffcc", cards: [
+            { n: "素描", d: 8, c: 1, desc: "+1流" },
+            { n: "调色", d: 6, c: 1, desc: "+1流/回血3" },
+            { n: "杰作", d: 15, c: -1, desc: "-1流稳健" }
+        ]}
+    };
+
+    let player = {}, boss = {}, level = 1;
+
+    // 存档功能
+    function save() {
+        const state = { level, p_hp: player.hp, type: player.type, p_res: player.res };
+        localStorage.setItem('mbti_tarot_save', JSON.stringify(state));
+    }
+
+    function startGame(type) {
+        const d = CHAR_DATA[type];
+        player = { type, hp: d.hp, maxHp: d.hp, res: 0, resName: d.res, color: d.color, baseCards: d.cards };
+        document.documentElement.style.setProperty('--p-color', d.color);
+        document.getElementById('selection-screen').style.display = 'none';
+        document.getElementById('game-ui').style.display = 'flex';
+        initLevel();
+    }
+
+    function initLevel() {
+        boss.maxHp = 50 + (level - 1) * 35;
+        boss.hp = boss.maxHp;
+        boss.dmg = 7 + (level - 1) * 4;
+        boss.n = ["愚者", "教皇", "恋人", "隐士", "死神"][Math.min(level-1, 4)];
+        addLog(`--- 第 ${level} 关：${boss.n} ---`, "#ffd700");
+        updateUI();
+        initHand();
+    }
+
+    function addLog(m, c = "#aaa") {
+        const l = document.getElementById('log');
+        l.innerHTML += `<div style="color:${c}">> ${m}</div>`;
+        l.scrollTop = l.scrollHeight;
+    }
+
+    function redrawHand() {
+        if(player.hp > 5) {
+            player.hp -= 5;
+            addLog("强制重构：消耗5点HP。", "#ff4444");
+            initHand();
+            updateUI();
+        }
+    }
+
+    function initHand() {
+        const h = document.getElementById('hand');
+        h.innerHTML = '';
+        let cards = [];
+        for(let i=0; i<3; i++) cards.push({...player.baseCards[Math.floor(Math.random()*3)]});
+        
+        // 死锁检查
+        if(!cards.some(c => c.c >= 0 || player.res >= Math.abs(c.c))) cards[0] = {...player.baseCards[0]};
+
+        cards.forEach(c => {
+            const el = document.createElement('div');
+            el.className = 'card';
+            const canPay = c.c >= 0 || player.res >= Math.abs(c.c);
+            if(!canPay) el.style.opacity = "0.3";
+            
+            let dmgVal = Array.isArray(c.d) ? `${c.d[0]}-${c.d[1]}` : c.d;
+            el.innerHTML = `<b style="font-size:13px">${c.n}</b><br><span style="color:#888">${c.desc}</span><hr style="width:80%;border:0;border-top:1px solid #333">
+                            <span style="color:#ff4444">⚔️${dmgVal}</span><br>
+                            <span style="color:var(--p-color)">${c.c>=0?'+':''}${c.c}${player.resName}</span>`;
+            el.onclick = () => playTurn(c);
+            h.appendChild(el);
+        });
+    }
+
+    function playTurn(c) {
+        if(c.c < 0 && player.res < Math.abs(c.c)) return;
+
+        player.res += c.c;
+        let d = Array.isArray(c.d) ? Math.floor(Math.random()*(c.d[1]-c.d[0]+1))+c.d[0] : c.d;
+
+        // 特性逻辑
+        if(player.type === 'ENFP' && player.res >= 3 && Math.random() > 0.6) {
+            d *= 2; addLog("✨灵感爆发！双倍伤害！", "#ffea00");
+        }
+        if(player.type === 'ISFP' && c.n === "调色") player.hp = Math.min(player.maxHp, player.hp + 3);
+
+        boss.hp -= d;
+        addLog(`${c.n} 造成 ${d} 点伤害`, "#fff");
+
+        if(boss.hp <= 0) { win(); return; }
+
+        // Boss反击
+        setTimeout(() => {
+            player.hp -= boss.dmg;
+            addLog(`${boss.n} 反击造成 ${boss.dmg} 伤害`, "#ff4444");
+            updateUI();
+            if(player.hp <= 0) { alert("战斗失败，灵魂破碎..."); location.reload(); }
+            save();
+        }, 300);
+
+        initHand();
+        updateUI();
+    }
+
+    function updateUI() {
+        document.getElementById('p-name').innerText = player.type;
+        document.getElementById('p-hp').innerText = player.hp;
+        document.getElementById('res-name').innerText = player.resName;
+        document.getElementById('p-res').innerText = player.res;
+        document.getElementById('b-hp').innerText = boss.hp;
+        document.getElementById('b-max-hp').innerText = boss.maxHp;
+        document.getElementById('b-fill').style.width = (boss.hp/boss.maxHp*100) + "%";
+        document.getElementById('boss-display').innerText = `[ ${boss.n} ]`;
+        document.getElementById('level').innerText = level;
+    }
+
+    function win() {
+        addLog(`战胜了 ${boss.n}！`, "#ffd700");
+        document.getElementById('relic-ui').style.display = 'block';
+        const list = document.getElementById('relic-list');
+        list.innerHTML = '';
+        const relics = [{n:"魔术师",d:"最大血量+20"},{n:"战车",d:"资源获取+1"},{n:"正义",d:"回血5点"}];
+        relics.forEach(r => {
+            const d = document.createElement('div');
+            d.className = 'relic-opt';
+            d.innerHTML = `<b>${r.n}</b><br><small>${r.d}</small>`;
+            d.onclick = () => {
+                if(r.n === "魔术师") player.maxHp += 20;
+                if(r.n === "正义") player.hp = Math.min(player.maxHp, player.hp+5);
+                level++;
+                document.getElementById('relic-ui').style.display = 'none';
+                initLevel();
+            };
+            list.appendChild(d);
+        });
+    }
+</script>
+</body>
+</html>
+```
