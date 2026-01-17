@@ -4,283 +4,629 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <!-- 微信分享元数据 -->
-    <title>塔罗迷宫：MBTI人格觉醒</title>
-    <meta name="description" content="测测你的MBTI人格，在塔罗幻境中挑战命运！">
-    
+    <title>塔罗迷宫 V2.7 - 命运全典</title>
     <style>
-        :root { --p-color: #00ffcc; --bg-dark: #0a0a0a; }
+        :root { --p-color: #00ffcc; --bg-dark: #050505; --accent: #ffd700; }
         * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+        body { background: var(--bg-dark); color: #eee; font-family: 'Courier New', monospace; margin: 0; height: 100vh; overflow: hidden; }
         
-        body { 
-            background: var(--bg-dark); color: #eee; 
-            font-family: 'Courier New', Courier, monospace; 
-            margin: 0; padding: 0; display: flex; flex-direction: column; align-items: center;
-            height: 100vh; overflow: hidden;
-        }
+        /* 动画 */
+        .shake { animation: shake 0.2s; }
+        @keyframes shake { 0%,100% {transform:translateX(0)} 25% {transform:translateX(-5px)} 75% {transform:translateX(5px)} }
+        .inverted-active { filter: invert(1) hue-rotate(180deg); }
 
-        /* 选角界面 */
-        #selection-screen { 
-            width: 100%; height: 100%; display: flex; flex-direction: column; 
-            align-items: center; justify-content: center; 
-            background: radial-gradient(circle, #1a1a2e 0%, #000 100%);
-            padding: 20px; text-align: center;
-        }
-        .char-list { display: flex; flex-direction: column; gap: 15px; width: 100%; max-width: 300px; }
-        .char-card { 
-            padding: 15px; border: 2px solid #444; background: #111; 
-            border-radius: 8px; cursor: pointer;
-        }
-        .char-card:active { transform: scale(0.98); border-color: var(--p-color); }
+        #battle-bg { position: fixed; inset: 0; z-index: -1; background-size: cover; background-position: center; filter: brightness(0.25); transition: 1s; }
 
-        /* 游戏主界面 */
-        #game-ui { 
-            display: none; width: 100%; max-width: 500px; height: 100%;
-            padding: 15px; flex-direction: column;
-        }
+        /* 全屏弹窗 */
+        .overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.95); z-index: 100; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 20px; text-align: center; }
+        .card-node { padding: 15px; border: 1px solid #444; background: #111; margin: 10px; width: 280px; cursor: pointer; border-radius: 4px; transition: 0.2s; }
+        .card-node:hover { border-color: var(--accent); background: #222; }
 
-        .stats-header { 
-            display: flex; justify-content: space-between; font-size: 14px;
-            padding: 10px; background: #111; border: 1px solid #333; margin-bottom: 10px;
-        }
+        /* 选择界面两列布局 */
+        #select-layer { display:flex; flex-wrap:wrap; gap:10px; justify-content:center; }
+        #select-layer .card-node { width:45%; max-width:280px; }
 
-        .boss-box { 
-            text-align: center; padding: 15px; border: 2px solid #ff4444; 
-            background: #1a0000; margin-bottom: 10px; position: relative;
-        }
-        .hp-bar { height: 6px; background: #300; margin-top: 8px; }
-        .hp-fill { height: 100%; background: #ff4444; transition: width 0.3s; }
+        /* 主UI */
+        #game-ui { display: none; flex-direction: column; height: 100%; padding: 10px; max-width: 500px; margin: 0 auto; }
+        .stats-bar { display: flex; justify-content: space-between; font-size: 12px; padding: 10px; border: 1px solid #333; background: #111; }
+        
+        .boss-box { padding: 10px; text-align: center; }
+        .portrait { width: 120px; height: 120px; border-radius: 50%; border: 2px solid #333; margin: 0 auto; overflow: hidden; background: #000; }
+        .portrait img { width: 100%; height: 100%; object-fit: cover; }
+        
+        .hp-wrap { width: 100%; height: 10px; background: #200; border-radius: 5px; margin: 10px 0; overflow: hidden; position: relative; }
+        #b-hp-fill { height: 100%; background: #ff4444; transition: 0.3s; }
+        #b-shield-fill { position: absolute; top:0; left:0; height: 100%; background: #55aaff; transition: 0.3s; }
 
-        .log-window { 
-            flex-grow: 1; overflow-y: auto; background: #000; border: 1px solid #222;
-            padding: 8px; font-size: 12px; margin-bottom: 10px; color: #aaa;
-        }
-
-        .controls { margin-bottom: 10px; display: flex; justify-content: center; }
-        .btn-redraw { 
-            background: #333; color: #fff; border: 1px solid #666; 
-            padding: 8px 20px; border-radius: 20px; font-size: 12px;
-        }
-
-        .hand { 
-            display: flex; gap: 8px; justify-content: center; 
-            padding-bottom: 20px;
-        }
-        .card { 
-            width: 31%; aspect-ratio: 2/3; border: 1px solid #444; 
-            background: #111; border-radius: 6px; display: flex;
-            flex-direction: column; align-items: center; justify-content: center;
-            text-align: center; font-size: 11px; padding: 5px;
-        }
-        .card:active { background: #222; border-color: var(--p-color); }
-
-        /* 遗物弹窗 */
-        #relic-ui {
-            display: none; position: fixed; top: 20%; left: 5%; width: 90%;
-            background: #000; border: 2px solid #ffd700; padding: 20px;
-            z-index: 100; text-align: center; box-shadow: 0 0 30px #000;
-        }
-        .relic-opt { 
-            display: block; width: 100%; padding: 12px; border: 1px solid #ffd700;
-            margin: 10px 0; color: #ffd700;
-        }
+        .log { flex-grow: 1; overflow-y: auto; background: rgba(0,0,0,0.6); padding: 10px; font-size: 13px; margin: 10px 0; border: 1px solid #222; line-height: 1.4; }
+        
+        .hand { display: flex; gap: 5px; justify-content: center; height: 130px; }
+        .card { width: 32%; border: 1px solid #555; background: #1a1a1a; padding: 5px; display: flex; flex-direction: column; justify-content: space-between; font-size: 11px; text-align: center; cursor: pointer; }
+        .card.inverted { border: 1px solid #ff0055; background: #300; box-shadow: 0 0 10px #ff0055; }
+        
+        .btn-refresh { width: 100%; padding: 10px; margin-top: 10px; background: #222; border: 1px solid #444; color: #888; border-radius: 4px; }
     </style>
 </head>
 <body>
 
-    <!-- 选择界面 -->
-    <div id="selection-screen">
-        <h2 style="color: #ffd700; margin-bottom: 5px;">塔罗迷宫</h2>
-        <p style="font-size: 12px; color: #888;">选择你的MBTI人格进入幻境</p>
-        <div class="char-list">
-            <div class="char-card" onclick="startGame('INTP')" style="--p-color: #ff00ff;">
-                <b style="color:#ff00ff">INTP 隐士</b><br><small>逻辑推演 · 爆发伤害</small>
-            </div>
-            <div class="char-card" onclick="startGame('ENFP')" style="--p-color: #ffea00;">
-                <b style="color:#ffea00">ENFP 愚者</b><br><small>灵感随机 · 极限翻盘</small>
-            </div>
-            <div class="char-card" onclick="startGame('ISFP')" style="--p-color: #00ffcc;">
-                <b style="color:#00ffcc">ISFP 星星</b><br><small>审美节奏 · 持续治愈</small>
-            </div>
-        </div>
-        <p style="margin-top: 20px; font-size: 10px; color: #444;">微信端优化版 v2.0</p>
+    <div id="battle-bg"></div>
+
+    <!-- 全局日志（在选择界面也可见） -->
+    <div id="global-log" style="position:fixed; right:12px; top:12px; width:260px; max-height:200px; overflow:auto; background:rgba(0,0,0,0.6); border:1px solid #222; padding:8px; font-size:12px; z-index:200; border-radius:6px;"> </div>
+
+    <!-- 选角层 -->
+    <div id="select-layer" class="overlay">
+        <h2 style="color:var(--accent); letter-spacing: 4px;">人格觉醒</h2>
+        <div class="card-node" onclick="(async function(){try{await SFX.init(); SFX.attack(); addLog('音效已启用','green')}catch(e){console.warn(e)}})()"><b style="color:#aaffff">启用音效</b><br><small>点击以启用音效</small></div>
+        <div class="card-node" onclick="initGame('INTP')"><b style="color:#ff00ff">INTP 隐士</b><br><small>逻辑推断 · 爆发输出</small></div>
+        <div class="card-node" onclick="initGame('ENFP')"><b style="color:#ffea00">ENFP 愚者</b><br><small>热情火花 · 随机奇迹</small></div>
+        <div class="card-node" onclick="initGame('ISFP')"><b style="color:#00ffcc">ISFP 星星</b><br><small>流体艺术 · 节奏回血</small></div>
+        <div class="card-node" onclick="initGame('INTJ')"><b style="color:#4a90e2">INTJ 策士</b><br><small>专注布局 · 战术护盾</small></div>
+        <div class="card-node" onclick="initGame('ENFJ')"><b style="color:#ff7e5f">ENFJ 统帅</b><br><small>共鸣鼓舞 · 团体增益</small></div>
+        <div class="card-node" onclick="initGame('INFJ')"><b style="color:#8e44ad">INFJ 提倡者</b><br><small>预言 · 灵觉 · 吸血</small></div>
     </div>
 
-    <!-- 游戏界面 -->
+    <!-- 结局层：未完待续 -->
+    <div id="ending-layer" class="overlay" style="display:none">
+        <h2 style="color:var(--accent); letter-spacing: 6px; font-size:28px;">终局：意识的边界</h2>
+        <p style="color:#ccc; max-width:560px;">在穿越了所有维度与试炼之后，意识抵达了一个裂缝。光芒映照下的记忆碎片纷纷远去，而真正的谜题才刚刚苏醒……</p>
+        <p style="color:#ffd700; font-size:18px;">未完待续</p>
+        <div class="card-node" onclick="(function(){document.getElementById('ending-layer').style.display='none'; location.reload();})()">重新开始</div>
+    </div>
+
+    <!-- 事件层 -->
+    <div id="event-layer" class="overlay" style="display:none">
+        <h3 id="event-title" style="color:var(--accent)">命运之轮</h3>
+        <p id="event-desc" style="padding: 0 20px; color: #ccc;"></p>
+        <div id="event-options"></div>
+    </div>
+
+  <!-- 奖励层：动态生成选项 -->
+    <div id="reward-layer" class="overlay" style="display:none">
+        <h3 style="color:var(--accent); letter-spacing: 2px;">维度重构</h3>
+        <p style="font-size: 12px; color: #888;">击败强敌，你的意识得到了进化...</p>
+        <div id="reward-options-container" style="display: flex; flex-direction: column; align-items: center;">
+            <!-- 选项将由 JS 动态注入 -->
+        </div>
+    </div>
+```
+
+    <!-- 游戏主界面 -->
     <div id="game-ui">
-        <div class="stats-header">
-            <div><b id="p-name"></b> HP:<span id="p-hp"></span></div>
-            <div style="color: var(--p-color)"><span id="res-name"></span>:<span id="p-res"></span></div>
-            <div>关卡:<span id="level"></span></div>
+        <div class="stats-bar">
+            <div style="display:flex; flex-direction:column; gap:6px;">
+                <div>❤️ <span id="p-hp"></span>/<span id="p-max-hp"></span></div>
+                <div style="width:140px;">
+                    <div style="font-size:10px; color:#888;">护盾</div>
+                    <div style="width:100%; height:8px; background:#111; border:1px solid #222; border-radius:6px; overflow:hidden;">
+                        <div id="p-shield-fill" style="height:100%; background:#55aaff; width:0%; transition:0.25s;"></div>
+                    </div>
+                </div>
+            </div>
+                <div>🛡️ <span id="p-shield">0</span></div>
+                <div id="res-tag">✨ 0</div>
+                <div>LAYER <span id="level-tag">1</span></div>
+                <div id="inv-badge" style="font-size:12px; padding:4px 8px; border-radius:6px; background:rgba(255,255,255,0.03); color:#ccc; align-self:center;">逆位：可用</div>
         </div>
 
         <div class="boss-box">
-            <div id="boss-display" style="font-size: 14px; color: #ff4444;">BOSS</div>
-            <div style="font-size: 12px;">HP: <span id="b-hp"></span>/<span id="b-max-hp"></span></div>
-            <div class="hp-bar"><div id="b-fill" class="hp-fill"></div></div>
+            <div class="portrait"><img id="b-img" src=""></div>
+            <div id="b-name" style="color:#ff4444; font-size:14px; margin:5px 0;"></div>
+            <div id="b-hp-text" style="font-size:12px; color:#fff; margin-bottom:6px;"></div>
+            <div style="font-size:10px; color:#55aaff">🛡️ 护盾: <span id="b-shield-val">0</span></div>
+            <div class="hp-wrap">
+                <div id="b-hp-fill"></div>
+                <div id="b-shield-fill"></div>
+            </div>
         </div>
 
-        <div class="log-window" id="log"></div>
-
-        <div class="controls">
-            <button class="btn-redraw" onclick="redrawHand()">🔄 重构手牌 (-5 HP)</button>
-        </div>
+        <div class="log" id="log"></div>
 
         <div class="hand" id="hand"></div>
-
-        <div id="relic-ui">
-            <h3 style="color:#ffd700">获得塔罗遗物</h3>
-            <div id="relic-list"></div>
-        </div>
+        <button class="btn-refresh" onclick="sacrifice()">🩸 牺牲 10HP 重构手牌</button>
+        
     </div>
 
 <script>
-    const CHAR_DATA = {
-        INTP: { hp: 80, res: "逻辑", color: "#ff00ff", cards: [
-            { n: "推演", d: 8, c: 1, desc: "+1逻辑" },
-            { n: "分析", d: 4, c: 2, desc: "+2逻辑" },
-            { n: "结论", d: 22, c: -3, desc: "-3逻辑爆发" }
-        ]},
-        ENFP: { hp: 100, res: "热情", color: "#ffea00", cards: [
-            { n: "火花", d: [5, 22], c: 1, desc: "+1热情" },
-            { n: "漫游", d: 10, c: 1, desc: "+1热情" },
-            { n: "狂想", d: [2, 45], c: -2, desc: "-2热情爆发" }
-        ]},
-        ISFP: { hp: 95, res: "流", color: "#00ffcc", cards: [
-            { n: "素描", d: 8, c: 1, desc: "+1流" },
-            { n: "调色", d: 6, c: 1, desc: "+1流/回血3" },
-            { n: "杰作", d: 15, c: -1, desc: "-1流稳健" }
-        ]}
+    // ZzFX - 超轻量级复古音效引擎（嵌入）
+    const zzfxV=.3,zzfx=([...t])=>{{let e,n,a,r,o,i,s,l,d,c,u,h,g,p,f,m,b,y,v,M,x=2*Math.PI,k=44100,z=t[0],P=t[1],S=t[2],T=t[3],j=t[4],w=t[5],A=t[6],B=t[7],C=t[8],D=t[9],E=t[10],F=t[11],G=t[12],H=t[13],I=t[14],L=t[15],N=t[16],O=t[17],R=t[18],U=t[19],X=Math.max(.001,T+j+w+A+B),Y=S+Math.PI/2,q=x*C/k,W=x*D/k,J=0,K=0,Q=0,V=1,Z=0,_=0,$=0,aa=new Float32Array(k*X);for(n=0;n<k*X;++n){if(++Z>=(u=Math.floor(k*Math.max(.001,F)))){for(Z=0,h=u,g=0;g<16;++g)h+=Math.floor(k*Math.max(.001,t[20+g]));V=1/h}if(i=Math.min(1,n/k/T),s=Math.min(1,(X-n/k)/B),l=n/k<T+j?i:n/k<T+j+w?1:s,l=L?Math.floor(l*L)/L:l,d=Math.cos(n/k*x*E+Y),c=Math.sin(q*n+W*Math.sin(Q*n+R)+aa[n-u]*N+d*O),v=Math.sin(x*n/k*V+aa[n-u]*I+c),M=Math.exp(-Math.abs(U)*5)*v,aa[n]=M*l*zzfxV,++J>=Math.floor(k*G))for(J=0,aa[n]=0,Q=0,g=0;g<16;++g)Q+=Math.floor(k*Math.max(.001,t[20+g]));Q=x*Q/k}const ba = window.zzfxAudioCtx || (window.zzfxAudioCtx = new (window.AudioContext||window.webkitAudioContext)());const ca=ba.createBuffer(1,aa.length,k);ca.getChannelData(0).set(aa);const da=ba.createBufferSource();da.buffer=ca,da.connect(ba.destination),da.start()}}
+
+    // SFX 库（16-bit 风格）
+    const SFX = {
+        // 初始化：创建共享 AudioContext，并在首次用户交互时尝试 resume（以满足浏览器策略）
+        init: async function(){
+            if(!window.zzfxAudioCtx){
+                try{ window.zzfxAudioCtx = new (window.AudioContext||window.webkitAudioContext)(); }catch(e){ console.warn('AudioContext 创建失败', e); }
+            }
+            try{
+                if(window.zzfxAudioCtx && window.zzfxAudioCtx.state === 'suspended') await window.zzfxAudioCtx.resume();
+                addLog('音效已启用', 'green');
+                // 立即播放一个短促的测试振荡器，便于确认浏览器允许输出
+                try{
+                    const ctx = window.zzfxAudioCtx;
+                    if(ctx){
+                        const g = ctx.createGain(); g.gain.value = 0.12;
+                        const o = ctx.createOscillator(); o.type = 'sine'; o.frequency.value = 660;
+                        o.connect(g); g.connect(ctx.destination);
+                        o.start();
+                        setTimeout(()=>{ try{ o.stop(); g.disconnect(); }catch(e){} }, 140);
+                    }
+                }catch(err){ console.warn('测试振荡器播放失败', err); }
+            }catch(e){
+                // 如果直接 resume 失败（非用户手势），退回到监听交互以便稍后 resume 并播放测试音
+                const resumeHandler = async () => {
+                    try{ if(window.zzfxAudioCtx && window.zzfxAudioCtx.state === 'suspended') await window.zzfxAudioCtx.resume(); addLog('音效已启用', 'green');
+                        try{ const ctx = window.zzfxAudioCtx; if(ctx){ const g = ctx.createGain(); g.gain.value = 0.12; const o = ctx.createOscillator(); o.type='sine'; o.frequency.value=660; o.connect(g); g.connect(ctx.destination); o.start(); setTimeout(()=>{ try{o.stop(); g.disconnect();}catch(e){} },140); } }catch(err2){console.warn('测试振荡器失败',err2)}
+                    }catch(err){ console.warn('音效启用失败', err); }
+                    window.removeEventListener('pointerdown', resumeHandler);
+                };
+                window.addEventListener('pointerdown', resumeHandler);
+            }
+        },
+        // 备用振荡器：支持波形类型
+        _beep: (freq=440, dur=120, vol=0.08, type='sine') => {
+            try{
+                const ctx = window.zzfxAudioCtx || (window.zzfxAudioCtx = new (window.AudioContext||window.webkitAudioContext)());
+                const g = ctx.createGain(); g.gain.value = vol;
+                const o = ctx.createOscillator(); o.type = type; o.frequency.value = freq;
+                const env = ctx.createGain(); env.gain.value = 1;
+                o.connect(env); env.connect(g); g.connect(ctx.destination);
+                o.start();
+                // 线性衰减以避免突兀的停止
+                env.gain.linearRampToValueAtTime(0.0001, ctx.currentTime + dur/1000);
+                setTimeout(()=>{ try{ o.stop(); g.disconnect(); env.disconnect(); }catch(e){} }, dur+20);
+            }catch(e){ console.warn('SFX._beep error', e); }
+        },
+        attack: () => { try{ zzfx([.9,.5,420,.02,.03,.12,1,1.4,6.5,-2,0,0,0,0,0,0,0,.12,.02,0]); }catch(e){}; SFX._beep(620,90,0.08,'square'); },
+        magic: () => { try{ zzfx([1.4, undefined, 380, .02, .12, .22, 1, 1.05, 9, undefined, undefined, undefined, undefined, undefined, .12, undefined, .35, .02, undefined, undefined]); }catch(e){}; SFX._beep(460,140,0.06,'sawtooth'); },
+        heal: () => { try{ zzfx([1.1,.08,600,.06,.45,.9,0,1.8,0,0,350,.08,0,0,0,0,0,.45,.08,0]); }catch(e){}; SFX._beep(780,200,0.06,'triangle'); },
+        hurt: () => { try{ zzfx([1.6, undefined, 130, .04, .03, .18, 4, 2.4, 1.3, undefined, undefined, undefined, undefined, 1.6, undefined, .12, undefined, .85, .06, undefined]); }catch(e){}; SFX._beep(200,180,0.12,'sawtooth'); },
+        awaken: () => { try{ zzfx([2.1, undefined, 12, .01, .18, .65, 4, 3.2, undefined, .1, undefined, undefined, .12, 1.6, undefined, .5, undefined, .6, .02, undefined]); }catch(e){}; SFX._beep(880,220,0.05,'sine'); }
     };
+    // SFX.init 将仅由用户操作触发（例如“启用音效”按钮）
+
+    // INFJ 专属音效（空灵 / 回声），同时触发备用振荡器以确保可听
+    const INFJ_SFX = {
+        visionUp: () => { try{ zzfx([1.2, .02, 1400, .01, .06, .12, 0, .7, 40, undefined, undefined, undefined, undefined, 1.2, undefined, .08, undefined, .6, .01, undefined]); }catch(e){console.warn(e)}; SFX._beep(1200,180,0.06,'triangle'); },
+        revelation: () => { try{ zzfx([1.6, .03, 520, .02, .18, .42, 1, 2.6, undefined, .45, 120, .04, .06, undefined, undefined, undefined, undefined, .9, .02, undefined]); }catch(e){console.warn(e)}; SFX._beep(880,260,0.05,'sine'); }
+    };
+
+    const CHARS = {
+        INTP: { hp: 80, res: "逻辑", color: "#ff00ff", cards: [
+            { n: "推演", d: 12, c: 1, txt: "+1逻辑" },
+            { n: "分析", d: 6, c: 2, txt: "+2逻辑" },
+            { n: "结论", d: 35, c: -3, txt: "-3逻辑爆发" }
+        ], inv: { n: "逆·悖论", d: 55, c: 0, txt: "无消耗爆发" } },
+        ENFP: { hp: 100, res: "热情", color: "#ffea00", cards: [
+            { n: "火花", d: [5,25], c: 1, txt: "+1热情" },
+            { n: "漫游", d: 15, c: 1, txt: "+1热情" },
+            { n: "狂想", d: [10,60], c: -2, txt: "-2热情爆发" }
+        ], inv: { n: "逆·极光", d: [40,80], c: 0, txt: "随机性巅峰" } },
+        ISFP: { hp: 90, res: "流", color: "#00ffcc", cards: [
+            { n: "素描", d: 11, c: 1, txt: "+1流" },
+            { n: "调色", d: 8, c: 1, txt: "+1流/回血8", h: 8 },
+            { n: "杰作", d: 25, c: -1, txt: "-1流稳定" }
+        ], inv: { n: "逆·神启", d: 25, c: 0, txt: "回血20", h: 20 } }
+        ,
+        INTJ: { 
+            hp: 75, res: "专注", color: "#4a90e2",
+            cards: [
+                { n: "观察", d: 8, c: 1, txt: "伤害永久+2", f: (p) => { p.dmgMod += 0.1; } },
+                { n: "布局", d: 5, c: 2, txt: "获得10护盾", f: (p) => { p.shield = (p.shield || 0) + 10; } },
+                { n: "将军", d: 30, c: -3, txt: "破盾双倍" }
+            ],
+            inv: { n: "逆·世界", d: 60, c: 0, txt: "摧毁护盾" }
+        },
+        ENFJ: {
+            hp: 120, res: "共鸣", color: "#ff7e5f",
+            cards: [
+                { n: "鼓舞", d: 10, c: 1, h: 5, txt: "回血5" },
+                { n: "统合", d: 15, c: 1, txt: "减伤防御", f: (p) => { p.tempDamageReduction = (p.tempDamageReduction||0) + 0.3; addLog("统合：本次减少30%受到伤害", "green"); } },
+                { n: "烈阳", d: 25, c: -2, txt: "生命加成", f: (p) => { return Math.floor(p.hp * 0.2); } }
+            ],
+            inv: { n: "逆·日蚀", d: 70, c: 0, txt: "献祭爆发", f: (p) => { p.hp = Math.max(1, p.hp - 15); p.nextIgnoreBossShield = true; addLog("逆·日蚀：以血为祭，穿透护盾！", "#ff7e5f"); return 50; } }
+        }
+        ,
+        INFJ: {
+            hp: 90, res: "灵觉", color: "#8e44ad",
+            cards: [
+                { n: "冥想", d: 7, c: 1, txt: "+1远见", f: (p) => { p.vision = (p.vision || 0) + 1; addLog('远见 +1', '#8e44ad'); try{ INFJ_SFX.visionUp(); }catch(e){} } },
+                { n: "共情", d: 12, c: 1, txt: "受损反弹", f: (p) => { if(p.tookDamageThisTurn){ boss.hp = Math.max(0, boss.hp - 15); addLog('共情反弹：Boss -15', '#8e44ad'); try{ SFX.attack(); }catch(e){} } } },
+                { n: "天启", d: 22, c: -2, txt: "穿透护盾", f: (p) => { p.vision = (p.vision || 0) + 1; p.nextIgnoreBossShield = true; addLog('天启：远见 +1，下一次穿透护盾', '#8e44ad'); try{ INFJ_SFX.revelation(); }catch(e){} } }
+            ],
+            inv: { n: "逆·月亮", d: 50, c: 0, txt: "免疫伤害+满远见", f: (p) => { boss.isConfused = true; p.vision = (p.vision || 0) + 3; addLog('逆·月亮：Boss 迷茫，本回合无法造成伤害；远见 +3', '#8e44ad'); try{ INFJ_SFX.revelation(); }catch(e){} return 50; } }
+        }
+    };
+
+    const BOSSES = [
+        { n: "愚者 · 混乱", img: "assets/boss_0.png", bg: "assets/bg_0.png", desc: "每3回合重置你的资源。" },
+        { n: "隐士 · 孤寂", img: "assets/boss_1.png", bg: "assets/bg_1.png", desc: "【冥想】每回合获得10点护盾。" },
+        { n: "教皇 · 戒律", img: "assets/boss_2.png", bg: "assets/bg_2.png", desc: "禁止连续使用同名卡。" },
+        { n: "死神 · 终焉", img: "assets/boss_3.png", bg: "assets/bg_3.png", desc: "每回合伤害增加2点。" }
+    ];
+
+    // 1. 定义丰富的奖励池
+    const REWARD_POOL = [
+        { 
+            id: 'growth', 
+            n: "生命重塑 (Growth)", 
+            d: "生命上限 +30，并立即修复 50HP", 
+            f: () => { player.maxHp += 30; player.hp = Math.min(player.maxHp, player.hp + 50); } 
+        },
+        { 
+            id: 'strength', 
+            n: "力量觉醒 (Strength)", 
+            d: "全卡牌基础伤害永久提升 15%", 
+            f: () => { player.dmgMod += 0.15; } 
+        },
+        { 
+            id: 'temperance', 
+            n: "节制精神 (Temperance)", 
+            d: "每场战斗开始时，额外获得 2 点初始资源", 
+            f: () => { player.initialResBonus = (player.initialResBonus || 0) + 2; } 
+        },
+        { 
+            id: 'devil', 
+            n: "恶魔交易 (Devil)", 
+            d: "重构手牌的生命代价从 10 降至 5", 
+            f: () => { player.sacrificeCost = 5; } 
+        },
+        { 
+            id: 'star', 
+            n: "星辰指引 (The Star)", 
+            d: "立即补满所有生命值，且资源 +3", 
+            f: () => { player.hp = player.maxHp; player.curRes += 3; } 
+        },
+        { 
+            id: 'emperor', 
+            n: "皇帝威严 (Emperor)", 
+            d: "本局后续受到的所有伤害减少 10%", 
+            f: () => { player.receivedDmgMod *= 0.9; } 
+        }
+    ];
 
     let player = {}, boss = {}, level = 1;
 
-    // 存档功能
-    function save() {
-        const state = { level, p_hp: player.hp, type: player.type, p_res: player.res };
-        localStorage.setItem('mbti_tarot_save', JSON.stringify(state));
-    }
-
-    function startGame(type) {
-        const d = CHAR_DATA[type];
-        player = { type, hp: d.hp, maxHp: d.hp, res: 0, resName: d.res, color: d.color, baseCards: d.cards };
-        document.documentElement.style.setProperty('--p-color', d.color);
-        document.getElementById('selection-screen').style.display = 'none';
+    function initGame(type) {
+        const d = CHARS[type];
+        player = { 
+            ...d, maxHp: d.hp, curRes: 0, lastCard: "", type: type,
+            dmgMod: 1.0, receivedDmgMod: 1.0, luckMax: false, 
+            perTurnEffects: [], nextCrit: false,
+            shield: 0,
+            invUsed: false
+        };
+        document.getElementById('select-layer').style.display = 'none';
         document.getElementById('game-ui').style.display = 'flex';
-        initLevel();
+        startLevel();
     }
 
-    function initLevel() {
-        boss.maxHp = 50 + (level - 1) * 35;
-        boss.hp = boss.maxHp;
-        boss.dmg = 7 + (level - 1) * 4;
-        boss.n = ["愚者", "教皇", "恋人", "隐士", "死神"][Math.min(level-1, 4)];
-        addLog(`--- 第 ${level} 关：${boss.n} ---`, "#ffd700");
+    function startLevel() {
+        triggerEvent();
+    }
+
+    function triggerEvent() {
+        const layer = document.getElementById('event-layer');
+        const opts = document.getElementById('event-options');
+        layer.style.display = 'flex';
+        opts.innerHTML = '';
+
+        // 整合你提供的 13 个随机事件
+        const evs = [
+            { t: "隐者的指引", d: "失去 5HP，获得 2 点初始资源", f: () => { player.hp -= 5; player.curRes += 2; } },
+            { t: "命运的豪赌", d: "随机恢复或失去 15HP", f: () => { player.hp += (Math.random() > 0.5 ? 15 : -15); } },
+            { t: "空白卡牌", d: "本关 Boss 初始生命减少 20%", f: () => { boss.hp *= 0.8; } },
+            { t: "不稳定的魔力", d: "随机获得 1-5 点资源，但有 30% 几率扣除 10HP", f: () => { player.curRes += Math.floor(Math.random() * 5) + 1; if (Math.random() < 0.3) player.hp -= 10; } },
+            { t: "强心剂", d: "HP 每减少 10%，造成的伤害增加 5%", f: () => { let loss = (1 - player.hp / player.maxHp); player.dmgMod += loss * 0.5; } },
+            { t: "神秘商贩", d: "消耗 10HP，思维重组：攻击力提升 20%", f: () => { player.hp -= 10; player.dmgMod += 0.2; } },
+            { t: "虚弱诅咒", d: "本关受到的伤害增加 50%，但初始资源翻倍", f: () => { player.receivedDmgMod *= 1.5; player.curRes *= 2; } },
+            { t: "幸运女神的微笑", d: "本关所有随机判定视为最大值", f: () => { player.luckMax = true; } },
+            { t: "时间回溯", d: "恢复至最大 HP 的 80%，但生命上限减少 10", f: () => { player.hp = player.maxHp * 0.8; player.maxHp -= 10; } },
+            { t: "诅咒宝箱", d: "获得 3 点资源，但每回合有 20% 几率自动扣除 5HP", f: () => { player.curRes += 3; player.perTurnEffects.push(() => { if (Math.random() < 0.2) { player.hp -= 5; addLog("诅咒发作：-5HP", "red"); } }); } },
+            { t: "狂战士之血", d: "攻击力翻倍，但受到的伤害也翻倍", f: () => { player.dmgMod *= 2; player.receivedDmgMod *= 2; } },
+            { t: "命运的馈赠", d: "随机获得一项正面状态（增伤/回血）", f: () => { if(Math.random()>0.5){player.dmgMod += 0.1; addLog("获得增伤","green");} else {player.hp += 20; addLog("获得回血","green");} } },
+            { t: "虚无之触", d: "下一次攻击必定双倍伤害，但消耗当前一半的 HP", f: () => { player.nextCrit = true; player.hp = Math.floor(player.hp / 2); } }
+        ];
+        
+        const ev = evs[Math.floor(Math.random()*evs.length)];
+        document.getElementById('event-title').innerText = ev.t;
+        document.getElementById('event-desc').innerText = ev.d;
+        
+        const btn = document.createElement('div');
+        btn.className = 'card-node';
+        btn.innerText = "接受命运";
+        btn.onclick = () => {
+            ev.f();
+            layer.style.display = 'none';
+            initBattle();
+        };
+        opts.appendChild(btn);
+    }
+
+    function initBattle() {
+        const bData = BOSSES[Math.min(level-1, 3)];
+        boss = { 
+            ...bData, 
+            hp: 50 + level*40, maxHp: 50 + level*40, 
+            dmg: 5 + level*2, shield: 0, turn: 0 
+        };
+
+        // 每场战斗重置逆位使用标志
+        player.invUsed = false;
+        // 应用“节制”奖励：初始资源
+        if(player.initialResBonus) player.curRes += player.initialResBonus;
+
+        document.getElementById('b-img').src = bData.img;
+        document.getElementById('battle-bg').style.backgroundImage = `url('${bData.bg}')`;
+        addLog(`--- LAYER ${level} : ${boss.n} ---`, varColor());
+        addLog(`特性: ${boss.desc}`, "#aaa");
         updateUI();
         initHand();
-    }
-
-    function addLog(m, c = "#aaa") {
-        const l = document.getElementById('log');
-        l.innerHTML += `<div style="color:${c}">> ${m}</div>`;
-        l.scrollTop = l.scrollHeight;
-    }
-
-    function redrawHand() {
-        if(player.hp > 5) {
-            player.hp -= 5;
-            addLog("强制重构：消耗5点HP。", "#ff4444");
-            initHand();
-            updateUI();
-        }
     }
 
     function initHand() {
         const h = document.getElementById('hand');
         h.innerHTML = '';
-        let cards = [];
-        for(let i=0; i<3; i++) cards.push({...player.baseCards[Math.floor(Math.random()*3)]});
+        // 本回合是否已经受到过伤害（供共情等判定使用）
+        player.tookDamageThisTurn = false;
+        const isInverted = (player.hp / player.maxHp) < 0.3;
         
-        // 死锁检查
-        if(!cards.some(c => c.c >= 0 || player.res >= Math.abs(c.c))) cards[0] = {...player.baseCards[0]};
+        if(isInverted) {
+            document.body.classList.add('inverted-active');
+            addLog("!! 逆位觉醒：思维坍塌中 !!", "#ff0055");
+            try{ SFX.awaken(); }catch(e){console.warn('SFX error',e)}
+        } else {
+            document.body.classList.remove('inverted-active');
+        }
 
-        cards.forEach(c => {
+        for(let i=0; i<3; i++) {
+            let card = (isInverted && i === 1) ? { ...player.inv, isInverted: true } : { ...player.cards[Math.floor(Math.random()*player.cards.length)] };
             const el = document.createElement('div');
-            el.className = 'card';
-            const canPay = c.c >= 0 || player.res >= Math.abs(c.c);
-            if(!canPay) el.style.opacity = "0.3";
+            el.className = `card ${card.isInverted ? 'inverted' : ''}`;
             
-            let dmgVal = Array.isArray(c.d) ? `${c.d[0]}-${c.d[1]}` : c.d;
-            el.innerHTML = `<b style="font-size:13px">${c.n}</b><br><span style="color:#888">${c.desc}</span><hr style="width:80%;border:0;border-top:1px solid #333">
-                            <span style="color:#ff4444">⚔️${dmgVal}</span><br>
-                            <span style="color:var(--p-color)">${c.c>=0?'+':''}${c.c}${player.resName}</span>`;
-            el.onclick = () => playTurn(c);
+            let dVal;
+            if (Array.isArray(card.d)) {
+                dVal = player.luckMax ? card.d[1] : `${card.d[0]}-${card.d[1]}`;
+            } else {
+                dVal = card.d;
+            }
+
+            el.innerHTML = `<b>${card.n}</b><br><small>${card.txt || ''}</small>
+                            <div style="color:#ff4444">⚔️ ${dVal}</div>
+                            <div style="color:var(--p-color)">${card.c>=0?'+':''}${card.c}</div>`;
+            el.onclick = () => playCard(card);
             h.appendChild(el);
-        });
+        }
     }
 
-    function playTurn(c) {
-        if(c.c < 0 && player.res < Math.abs(c.c)) return;
-
-        player.res += c.c;
-        let d = Array.isArray(c.d) ? Math.floor(Math.random()*(c.d[1]-c.d[0]+1))+c.d[0] : c.d;
-
-        // 特性逻辑
-        if(player.type === 'ENFP' && player.res >= 3 && Math.random() > 0.6) {
-            d *= 2; addLog("✨灵感爆发！双倍伤害！", "#ffea00");
+    function playCard(card) {
+        if(!card.isInverted && card.c < 0 && player.curRes < Math.abs(card.c)) return addLog("能量不足", "#555");
+        // 限制：每个 Boss 只允许使用一次逆位（inv）技能
+        if(card.isInverted) {
+            if(player.invUsed) return addLog("逆位技能本场已用过", "#555");
+            player.invUsed = true; // 标记已使用，直至下一场战斗重置
+            try{ updateUI(); }catch(e){}
         }
-        if(player.type === 'ISFP' && c.n === "调色") player.hp = Math.min(player.maxHp, player.hp + 3);
+        // 播放对应音效
+        try{
+            if(card.h) SFX.heal();
+            else if(card.c < 0) SFX.magic();
+            else SFX.attack();
+        }catch(e){console.warn('SFX play error', e)}
 
-        boss.hp -= d;
-        addLog(`${c.n} 造成 ${d} 点伤害`, "#fff");
+        player.curRes += card.c;
+        if(card.h) player.hp = Math.min(player.maxHp, player.hp + card.h);
+        
+        // 教皇机制
+        if(boss.n.includes("教皇") && player.lastCard === card.n) {
+            player.hp -= 12; addLog("违反戒律：-12HP", "red");
+        }
+        player.lastCard = card.n;
 
-        if(boss.hp <= 0) { win(); return; }
+        // 如果卡有副作用函数，先执行（可修改 player），并接收返回的额外伤害值
+        let extraDmg = 0;
+        if(typeof card.f === 'function'){
+            try { const r = card.f(player); if(typeof r === 'number') extraDmg = r; } catch(e){ console.error(e); }
+        }
 
-        // Boss反击
+        // 伤害计算
+        let dmg;
+        if (Array.isArray(card.d)) {
+            dmg = player.luckMax ? card.d[1] : Math.floor(Math.random()*(card.d[1]-card.d[0]+1))+card.d[0];
+        } else {
+            dmg = card.d;
+        }
+
+        // 应用伤害加成
+        dmg = Math.floor(dmg * player.dmgMod);
+        if (player.nextCrit) { dmg *= 2; player.nextCrit = false; addLog("虚无之触：伤害翻倍！", varColor()); }
+
+        // 加上卡牌返回的额外伤害（例如 ENFJ 烈阳）
+        if(extraDmg) dmg += extraDmg;
+
+        // INFJ 远见判定：若远见达到 3，则本次攻击伤害翻倍并吸血 15%
+        if(player.type === 'INFJ' && (player.vision || 0) >= 3) {
+            dmg = Math.floor(dmg * 2);
+            const vamp = Math.floor(dmg * 0.15);
+            player.hp = Math.min(player.maxHp, player.hp + vamp);
+            player.vision = 0;
+            addLog("✨ 预言实现：双倍伤害并汲取生命！", "#8e44ad");
+            try{ INFJ_SFX.revelation(); }catch(e){}
+        }
+
+        // 结算护盾（Boss 护盾优先抵挡），若卡牌设置了 nextIgnoreBossShield 则忽略 Boss 护盾抵挡一次
+        if(player.nextIgnoreBossShield) {
+            // 忽略一次 Boss 护盾抵挡
+            player.nextIgnoreBossShield = false;
+            addLog("逆位：穿透护盾！", "#ffd700");
+        } else if(boss.shield > 0) {
+            let sDmg = Math.min(boss.shield, dmg);
+            boss.shield -= sDmg;
+            dmg -= sDmg;
+        }
+        boss.hp -= dmg;
+        
+        addLog(`使用 ${card.n}，造成 ${dmg} 伤害`, "#fff");
+        document.getElementById('b-img').classList.add('shake');
+        setTimeout(()=>document.getElementById('b-img').classList.remove('shake'), 200);
+
+        if(boss.hp <= 0) return winBattle();
+
+        // Boss 回合
         setTimeout(() => {
-            player.hp -= boss.dmg;
-            addLog(`${boss.n} 反击造成 ${boss.dmg} 伤害`, "#ff4444");
-            updateUI();
-            if(player.hp <= 0) { alert("战斗失败，灵魂破碎..."); location.reload(); }
-            save();
-        }, 300);
+            boss.turn++;
+            // 执行每回合效果（如诅咒）
+            player.perTurnEffects.forEach(f => f());
 
-        initHand();
+            if(boss.n.includes("隐士")) boss.shield = 10;
+            if(boss.n.includes("死神")) boss.dmg += 2;
+            if(boss.n.includes("愚者") && boss.turn % 3 === 0) {
+                player.curRes = 0; addLog("愚者扭曲了能量！", "purple");
+            }
+
+            let reduction = (player.tempDamageReduction || 0);
+            let finalBossDmg = Math.floor(boss.dmg * player.receivedDmgMod * (1 - reduction));
+            // 重置临时减伤
+            player.tempDamageReduction = 0;
+            // Boss 迷茫状态会令本回合伤害为 0
+            if(boss.isConfused) { finalBossDmg = 0; addLog(`${boss.n} 陷入迷茫：本回合无法造成伤害`, "#8e44ad"); boss.isConfused = false; }
+            // 玩家护盾优先抵挡
+            if(player.shield && player.shield > 0) {
+                const blocked = Math.min(player.shield, finalBossDmg);
+                player.shield -= blocked;
+                finalBossDmg -= blocked;
+                addLog(`${boss.n} 攻击被护盾抵挡：-${blocked} HP`, "#55aaff");
+            }
+            player.hp -= finalBossDmg;
+            // 标记本回合玩家是否受到过伤害（供卡牌判定使用）
+            player.tookDamageThisTurn = finalBossDmg > 0;
+            if(finalBossDmg > 0) {
+                try { SFX.hurt(); } catch(e){console.warn('SFX hurt error', e); }
+                addLog(`${boss.n} 反击：-${finalBossDmg} HP`, "#ff4444");
+            }
+            
+            if(player.hp <= 0) { alert("意识瓦解..."); location.reload(); }
+            updateUI();
+            initHand();
+        }, 400);
+    }
+
+    // 2. 胜利后随机抽取 3 个奖励
+    function winBattle() {
+        try{ SFX.heal(); } catch(e){console.warn('SFX heal error', e)}
+        addLog("战役胜利！意识维度提升。", varColor());
+        
+        // 重置部分单场状态
+        player.luckMax = false;
+        
+        const container = document.getElementById('reward-options-container');
+        container.innerHTML = '';
+        
+        // 随机打乱并取前 3 个
+        const shuffled = [...REWARD_POOL].sort(() => 0.5 - Math.random());
+        const selections = shuffled.slice(0, 3);
+        
+        selections.forEach(reward => {
+            const btn = document.createElement('div');
+            btn.className = 'card-node';
+            btn.innerHTML = `<b>${reward.n}</b><br><small>${reward.d}</small>`;
+            btn.onclick = () => {
+                reward.f(); // 执行效果
+                level++;
+                document.getElementById('reward-layer').style.display = 'none';
+                if(level > BOSSES.length) showEnding(); else startLevel();
+            };
+            container.appendChild(btn);
+        });
+
+        document.getElementById('reward-layer').style.display = 'flex';
+    }
+
+    // 通用奖励应用函数：支持 legacy 类型与 REWARD_POOL id
+    function applyReward(id) {
+        // 兼容旧的简单奖励 key
+        if(id === 'heal') player.hp = Math.min(player.maxHp, player.hp + player.maxHp*0.4);
+        else if(id === 'max') { player.maxHp += 30; player.hp += 30; }
+        else if(id === 'res') player.curRes += 2;
+        else {
+            const r = REWARD_POOL.find(x => x.id === id);
+            if(r && typeof r.f === 'function') r.f();
+        }
+
+        level++;
+        document.getElementById('reward-layer').style.display = 'none';
+        if(level > BOSSES.length) showEnding(); else startLevel();
+    }
+
+    function sacrifice() {
+        const cost = player.sacrificeCost || 10; // 默认 10，有奖励则为 5
+        if(player.hp <= cost) return addLog("生命力不足以重构...", "#555");
+        player.hp -= cost;
+        addLog(`🩸 牺牲 ${cost}HP 重构思维...`, "#ff4444");
         updateUI();
+        initHand();
     }
 
     function updateUI() {
-        document.getElementById('p-name').innerText = player.type;
-        document.getElementById('p-hp').innerText = player.hp;
-        document.getElementById('res-name').innerText = player.resName;
-        document.getElementById('p-res').innerText = player.res;
-        document.getElementById('b-hp').innerText = boss.hp;
-        document.getElementById('b-max-hp').innerText = boss.maxHp;
-        document.getElementById('b-fill').style.width = (boss.hp/boss.maxHp*100) + "%";
-        document.getElementById('boss-display').innerText = `[ ${boss.n} ]`;
-        document.getElementById('level').innerText = level;
+        document.getElementById('p-hp').innerText = Math.max(0, Math.ceil(player.hp));
+        document.getElementById('p-max-hp').innerText = player.maxHp;
+        document.getElementById('p-shield').innerText = Math.max(0, Math.ceil(player.shield || 0));
+        document.getElementById('res-tag').innerText = `✨ ${player.curRes} ${player.res}`;
+        document.getElementById('level-tag').innerText = level;
+        document.getElementById('b-name').innerText = boss.n;
+        document.getElementById('b-hp-text').innerText = `${Math.max(0, Math.ceil(boss.hp))}/${boss.maxHp}`;
+        document.getElementById('b-hp-fill').style.width = Math.max(0, (boss.hp/boss.maxHp*100)) + "%";
+        document.getElementById('b-shield-fill').style.width = (boss.shield/boss.maxHp*100) + "%";
+        document.getElementById('b-shield-val').innerText = boss.shield;
+        // update player shield bar width relative to maxHp
+        const pShieldPct = Math.max(0, Math.min(100, ((player.shield||0)/player.maxHp)*100));
+        document.getElementById('p-shield-fill').style.width = pShieldPct + "%";
+        // 更新逆位徽章显示
+        try{
+            const inv = document.getElementById('inv-badge');
+            if(inv){
+                if(player.invUsed) { inv.innerText = '逆位：已用'; inv.style.background = 'rgba(255,255,255,0.03)'; inv.style.color = '#888'; }
+                else { inv.innerText = '逆位：可用'; inv.style.background = 'linear-gradient(90deg,#222,#111)'; inv.style.color = '#ffd700'; }
+            }
+        }catch(e){}
     }
 
-    function win() {
-        addLog(`战胜了 ${boss.n}！`, "#ffd700");
-        document.getElementById('relic-ui').style.display = 'block';
-        const list = document.getElementById('relic-list');
-        list.innerHTML = '';
-        const relics = [{n:"魔术师",d:"最大血量+20"},{n:"战车",d:"资源获取+1"},{n:"正义",d:"回血5点"}];
-        relics.forEach(r => {
-            const d = document.createElement('div');
-            d.className = 'relic-opt';
-            d.innerHTML = `<b>${r.n}</b><br><small>${r.d}</small>`;
-            d.onclick = () => {
-                if(r.n === "魔术师") player.maxHp += 20;
-                if(r.n === "正义") player.hp = Math.min(player.maxHp, player.hp+5);
-                level++;
-                document.getElementById('relic-ui').style.display = 'none';
-                initLevel();
-            };
-            list.appendChild(d);
-        });
+    function addLog(m, c) {
+        const color = c || '#fff';
+        // 主战斗日志（如果存在且可见）
+        const l = document.getElementById('log');
+        if(l) {
+            try{ l.innerHTML += `<div style="color:${color}">> ${m}</div>`; l.scrollTop = l.scrollHeight; }catch(e){}
+        }
+        // 全局日志（总是在页面右上角可见）
+        let g = document.getElementById('global-log');
+        if(!g) {
+            g = document.createElement('div'); g.id = 'global-log'; document.body.appendChild(g);
+            g.style = 'position:fixed; right:12px; top:12px; width:260px; max-height:200px; overflow:auto; background:rgba(0,0,0,0.6); border:1px solid #222; padding:8px; font-size:12px; z-index:200; border-radius:6px;';
+        }
+        // 将最新日志放在最上方并限制条数
+        try{
+            const entry = document.createElement('div'); entry.style.color = color; entry.innerText = `> ${m}`;
+            g.insertBefore(entry, g.firstChild);
+            while(g.children.length > 6) g.removeChild(g.lastChild);
+        }catch(e){ console.warn('global-log error', e); }
     }
+
+    function varColor() { return CHARS[player.type].color; }
+
+    // 显示结局覆盖层
+    function showEnding() {
+        document.getElementById('ending-layer').style.display = 'flex';
+        addLog('你已穿越所有已知维度，故事在此处暂告一段落……', '#ffd700');
+        // 可选：微调背景或音效（留空以便后续拓展）
+    }
+
+    // 简单 sleep
+    function sleep(ms){ return new Promise(res => setTimeout(res, ms)); }
+
+    // Demo 自动化已移除（ENFJ 测试不再自动运行）
+
+    
 </script>
 </body>
 </html>
