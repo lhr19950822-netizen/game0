@@ -8,7 +8,8 @@
     <style>
         :root { --p-color: #00ffcc; --bg-dark: #050505; --accent: #ffd700; }
         * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-        body { background: var(--bg-dark); color: #eee; font-family: 'Courier New', monospace; margin: 0; height: 100vh; overflow: hidden; }
+        html, body { height: 100%; }
+        body { background: var(--bg-dark); color: #eee; font-family: 'Courier New', monospace; margin: 0; min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 12px; overflow: auto; }
         
         /* 动画 */
         .shake { animation: shake 0.2s; }
@@ -27,7 +28,7 @@
         #select-layer .card-node { width:45%; max-width:280px; }
 
         /* 主UI */
-        #game-ui { display: none; flex-direction: column; height: 100%; padding: 10px; max-width: 500px; margin: 0 auto; }
+        #game-ui { display: none; flex-direction: column; height: auto; padding: 10px; max-width: 500px; width: 100%; margin: 0 auto; max-height: calc(100vh - 24px); overflow: auto; border-radius: 8px; }
         .stats-bar { display: flex; justify-content: space-between; font-size: 12px; padding: 10px; border: 1px solid #333; background: #111; }
         
         .boss-box { padding: 10px; text-align: center; }
