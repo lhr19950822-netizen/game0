@@ -39,7 +39,7 @@
         #b-hp-fill { height: 100%; background: #ff4444; transition: 0.3s; }
         #b-shield-fill { position: absolute; top:0; left:0; height: 100%; background: #55aaff; transition: 0.3s; }
 
-        .log { flex-grow: 1; overflow-y: auto; background: rgba(0,0,0,0.6); padding: 10px; font-size: 13px; margin: 10px 0; border: 1px solid #222; line-height: 1.4; }
+        .log { max-height: 220px; overflow-y: auto; background: rgba(0,0,0,0.6); padding: 10px; font-size: 13px; margin: 10px 0; border: 1px solid #222; line-height: 1.4; }
         
         .hand { display: flex; gap: 5px; justify-content: center; height: 130px; }
         .card { width: 32%; border: 1px solid #555; background: #1a1a1a; padding: 5px; display: flex; flex-direction: column; justify-content: space-between; font-size: 11px; text-align: center; cursor: pointer; }
@@ -51,9 +51,6 @@
 <body>
 
     <div id="battle-bg"></div>
-
-    <!-- 全局日志（在选择界面也可见） -->
-    <div id="global-log" style="position:fixed; right:12px; top:12px; width:260px; max-height:200px; overflow:auto; background:rgba(0,0,0,0.6); border:1px solid #222; padding:8px; font-size:12px; z-index:200; border-radius:6px;"> </div>
 
     <!-- 选角层 -->
     <div id="select-layer" class="overlay">
@@ -594,23 +591,21 @@
 
     function addLog(m, c) {
         const color = c || '#fff';
-        // 主战斗日志（如果存在且可见）
         const l = document.getElementById('log');
         if(l) {
-            try{ l.innerHTML += `<div style="color:${color}">> ${m}</div>`; l.scrollTop = l.scrollHeight; }catch(e){}
+            try{
+                const entry = document.createElement('div');
+                entry.style.color = color;
+                entry.innerText = `> ${m}`;
+                l.appendChild(entry);
+                // 限制日志条数，避免无限增长（保留最近 120 条）
+                while(l.children.length > 120) l.removeChild(l.firstChild);
+                l.scrollTop = l.scrollHeight;
+            }catch(e){ console.warn('log append error', e); }
+        } else {
+            // 如果主日志不存在，回退到控制台输出
+            console.log(m);
         }
-        // 全局日志（总是在页面右上角可见）
-        let g = document.getElementById('global-log');
-        if(!g) {
-            g = document.createElement('div'); g.id = 'global-log'; document.body.appendChild(g);
-            g.style = 'position:fixed; right:12px; top:12px; width:260px; max-height:200px; overflow:auto; background:rgba(0,0,0,0.6); border:1px solid #222; padding:8px; font-size:12px; z-index:200; border-radius:6px;';
-        }
-        // 将最新日志放在最上方并限制条数
-        try{
-            const entry = document.createElement('div'); entry.style.color = color; entry.innerText = `> ${m}`;
-            g.insertBefore(entry, g.firstChild);
-            while(g.children.length > 6) g.removeChild(g.lastChild);
-        }catch(e){ console.warn('global-log error', e); }
     }
 
     function varColor() { return CHARS[player.type].color; }
